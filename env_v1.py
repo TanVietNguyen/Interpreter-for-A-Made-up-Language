@@ -36,3 +36,5 @@ class EnvironmentManager:
     
     def exit_scope(self):
         self.environment.pop()
+    def print_scope(self):
+        print(self.environment[-1])

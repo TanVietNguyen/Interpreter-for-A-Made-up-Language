@@ -64,21 +64,30 @@ class Interpreter(InterpreterBase):
 #  no uppercases,no quotes. nil value will not be tested(checked)
     def __run_statements(self, statements):
         # all statements of a function are held in arg3 of the function AST node
+        returned_value = Value(Type.NIL, None)
         for statement in statements:
+            print(statement)
             if self.trace_output:
                 print(statement)
             if statement.elem_type == InterpreterBase.FCALL_NODE:
-                self.__call_func(statement)
+                returned_value = self.__call_func(statement)
             elif statement.elem_type == "=":
                 self.__assign(statement)
             elif statement.elem_type == InterpreterBase.VAR_DEF_NODE:
                 self.__var_def(statement)
             elif statement.elem_type == InterpreterBase.IF_NODE:
-                self.__if(statement)
+                result = self.__if(statement)
+                # if block has return statement, terminate the function
+                if (result is not None):
+                    # print(result.value())
+                    return result
             elif statement.elem_type == InterpreterBase.FOR_NODE:
                 self.__for(statement)
             elif statement.elem_type == InterpreterBase.RETURN_NODE:
+                # print(statement.get("expression"))
+                # print(self.__return(statement).value())
                 return self.__return(statement)
+        return returned_value
     # Support recursion via function calls (checked)not entirely sure, could have some potential bugs
     # Support overloaded functions if they take different numbers of parameters(checked)
     # functions can return a value : return a default value of nil if functions
@@ -112,19 +121,20 @@ class Interpreter(InterpreterBase):
         for arg, para in zip(call_node.get("args"), func_node.get("args")):
             result = self.__eval_expr(arg)
             self.env.create(para.get("name"), result)
-            # print(self.env.get(para.get("name")))
+            # print(self.env.get(para.get("name")).value())
         return_value = self.__run_statements(func_node.get("statements"))
-        # print("Return value after __run_function: ",return_value)
+        # print("Return value after __run_function: ",return_value.value())
         self.env.exit_scope()
-        # print("Return value after __run_function: ",return_value.value)
+        # print("Return value after __run_function: ",return_value)
         return return_value
+    
     def __call_print(self, call_ast):
         output = ""
         for arg in call_ast.get("args"):
             result = self.__eval_expr(arg)  # result is a Value object
             output = output + get_printable(result)
         super().output(output)
-        return None # TO-DO, not sure if we need to return None in other cases beside in an expression 
+        return Value(Type.NIL, None) # checked, print() always returns value of nil
 
     def __call_input(self, call_ast):
         args = call_ast.get("args")
@@ -165,16 +175,21 @@ class Interpreter(InterpreterBase):
     # if no else clause, otherwise statements in this block will be executed once condition is false)(checked)
     def __if(self, if_ast):
         self.env.enter_scope()
+        # print(if_ast.get("condition"))
         condition_result = self.__eval_expr(if_ast.get("condition"))
+        
+        # print(self.env.get("a").value())
         if (condition_result.type() != Type.BOOL):
             super().error(ErrorType.TYPE_ERROR, f"If condition does not return bool value")
         # execute statement in the if block if condition is true
-        returned_value = Value(Type.NIL, None)
-        if condition_result:
+        returned_value = None
+        if condition_result.value():
             returned_value = self.__run_statements(if_ast.get("statements"))
+            # print(returned_value)
         else:
             else_clause_return = if_ast.get("else-staements")
             if else_clause_return != None:
+                # print("running statements in else block")
                 returned_value = self.__run_statements(else_clause_return)
         self.env.exit_scope()
         return returned_value
@@ -190,22 +205,22 @@ class Interpreter(InterpreterBase):
     def __for(self, for_ast):
         self.env.enter_scope()
         initialization = for_ast.get("init")
-        if (initialization.elem_type == Type.vardef):
+        if (initialization.elem_type == "="):
             self.__assign(initialization)
         else:
             super().error(ErrorType.TYPE_ERROR,"Initialization in loop must be an assignment")
         loop_flag = True
         while loop_flag:
-            condition = self.__eval_expr(for_ast.get("initilization"))
-            if (condition.elem_type != Type.BOOL):
+            condition = self.__eval_expr(for_ast.get("condition"))
+            if (condition.type() != Type.BOOL):
                 super().error(ErrorType.TYPE_ERROR, "Loop condition must evaluate to bool values")
             statements = for_ast.get("statements")
-            if condition:
+            if condition.value():
                 self.__run_statements(statements)
             else:
                 loop_flag = False
             update = for_ast.get("update")
-            if update.elem_type == Type.vardef:
+            if update.elem_type == "=":
                 self.__assign(update)
             else:
                 super().error(ErrorType.TYPE_ERROR, "Update in loops must be an assignment")
@@ -221,14 +236,19 @@ class Interpreter(InterpreterBase):
     # 
     def __return(self, return_ast):
         expression = return_ast.get("expression")
-        if (expression == None):
+        # print(return_ast, expression)
+        # print(expression)
+        if (expression is None):
             # print("return none")
             return Value(Type.NIL, None)
         # print(isinstance(self.__eval_expr(expression), Value))
+        # if isinstance(self.__eval_expr(expression), Value):
+            # print(self.__eval_expr(expression).value())
         return self.__eval_expr(expression)
 
 
     def __eval_expr(self, expr_ast):
+        # print(expr_ast)
         if expr_ast.elem_type == InterpreterBase.INT_NODE:
             # print("return an int here")
             return Value(Type.INT, expr_ast.get("val"))
@@ -249,11 +269,15 @@ class Interpreter(InterpreterBase):
             return self.__call_func(expr_ast)
         if expr_ast.elem_type in (self.ARITH_OPS | self.COMP_OPS | self.LOG_OPS | self.STR_OPS):
             return self.__eval_op(expr_ast)
-
+        if expr_ast.elem_type == InterpreterBase.NIL_NODE:
+            return Value(Type.NIL, None)
+        
     def __eval_op(self, ops_ast):
         if(ops_ast.elem_type not in ["neg", "!"]):
+            # print(ops_ast)
             left_value_obj = self.__eval_expr(ops_ast.get("op1"))
             right_value_obj = self.__eval_expr(ops_ast.get("op2"))
+            # print(left_value_obj, right_value_obj)
             # print(left_value_obj, right_value_obj.value())
             # Legal to compare different types (including None) with == and !=
             # Illegal to compare diferent tyes with the rest of comparison operations(checked)
@@ -273,6 +297,7 @@ class Interpreter(InterpreterBase):
                     f"Incompatible operator {ops_ast.elem_type} for type {left_value_obj.type()}",
                 )
             f = self.op_to_lambda[left_value_obj.type()][ops_ast.elem_type]
+            # print(left_value_obj.value(), right_value_obj.value())
             return f(left_value_obj, right_value_obj)
         else:
             op1_obj = self.__eval_expr(ops_ast.get("op1"))
@@ -290,7 +315,8 @@ class Interpreter(InterpreterBase):
     def __setup_ops(self):
         self.op_to_lambda = {Type.INT: {},
                             Type.BOOL: {},
-                            Type.STRING: {}
+                            Type.STRING: {},
+                            Type.NIL: {}
         }
         # set up operations on integers
         # ARITH_OPS = {"+", "-", "*", "/", "-"}
@@ -323,31 +349,41 @@ class Interpreter(InterpreterBase):
         # STR_OPS = {"+"}
         str_operation = {
             "+": lambda x, y: Value(x.type(), x.value() + y.value()),
-            "==": lambda x, y: Value(x.type(), x.value() == y.value()),
-            "!=": lambda x, y: Value(x.type(), x.value() != y.value())
+            "==": lambda x, y: Value(Type.BOOL, x.value() == y.value()),
+            "!=": lambda x, y: Value(Type.BOOL, x.value() != y.value())
+        }
+        nil_operation = {
+            "==": lambda x, y: Value(Type.BOOL, x.value() == y.value()),
+            "!=": lambda x, y: Value(Type.BOOL, x.value() != y.value())
         }
         self.op_to_lambda[Type.INT].update(int_operation)
         self.op_to_lambda[Type.BOOL].update(bool_operation)
         self.op_to_lambda[Type.STRING].update(str_operation)
+        self.op_to_lambda[Type.NIL].update(nil_operation)
 
         # add other operators here later for int, string, bool, etc
 # def main():
-#     program =  """
-#       func foo() { 
-#  print("hello");
-#  /* no explicit return command */
+#     program =    """
+#      func foo() {
+#  print(1);
 # }
 
-# func bar(a) {
-#   return a;  /* no return value specified */
+# func bar() {
+#  return nil;
 # }
 
 # func main() {
-#    var val;
-#    val = nil;
-#    print("hello");
-#    print(bar(4));
-#    if (bar(3) != 2) { print("this should print!"); }
+#  var x;
+#  x = foo();
+#  if (x == nil) {
+#   print(2);
+#  }
+#  var y;
+#  y = bar();
+#  if (y == nil) {
+#   print(3);
+#  }
+ 
 # }
 
 # """

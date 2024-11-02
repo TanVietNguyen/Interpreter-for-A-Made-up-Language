@@ -38,7 +38,7 @@ def create_value(val):
 
 
 def get_printable(val):
-    if (val == None):
+    if (val is None):
         # print("nothing here")
         return "nil"
     elif isinstance(val, Value):
@@ -46,7 +46,7 @@ def get_printable(val):
             # print("there an int here")
             return str(val.value())
         elif (val.type() == Type.NIL):   
-            return val.value()
+            return "nil"
         elif val.type() == Type.STRING:
             return val.value()
         elif val.type() == Type.BOOL:
