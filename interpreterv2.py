@@ -13,7 +13,7 @@ class Interpreter(InterpreterBase):
     # have higher precedence than substractions and additions. And they are evaluated
     # from left to right. Comparisons have the lowest precedence.
     # Our parser takes precedence into account when generating ASTs, so no need special handlings
-    ARITH_OPS = {"+", "-", "*", "/", "-"}
+    ARITH_OPS = {"+", "-", "*", "/", "neg"}
     # Comparison operations
     COMP_OPS = {"==", "!=", "<", "<=", ">", ">="}
     # Logical operations (precedence order negation > comparison and arithmetic operations > && > ||)
@@ -33,7 +33,8 @@ class Interpreter(InterpreterBase):
     def run(self, program):
         ast = parse_program(program)
         self.__set_up_function_table(ast)
-        main_func = self.__get_func_by_name("main")
+        # print(self.func_name_to_ast)
+        main_func = self.__get_func_by_name("main",0)
         self.env = EnvironmentManager()
         self.__run_statements(main_func.get("statements"))
 
@@ -45,10 +46,11 @@ class Interpreter(InterpreterBase):
         for func_def in ast.get("functions"):
             # Use dictionary of dictionaries to store overloaded functions
             function_name = func_def.get("name")
-            function_args = func_def.get("args")
+            num_args = len(func_def.get("args"))
             if (function_name not in self.func_name_to_ast):
                 self.func_name_to_ast[function_name] = {}
-            self.func_name_to_ast[function_name][function_args] = func_def
+            self.func_name_to_ast[function_name][num_args] = func_def
+        
 
     # Need to also provide num_args to access overloaded functions
     def __get_func_by_name(self, name, num_args):
@@ -76,7 +78,7 @@ class Interpreter(InterpreterBase):
             elif statement.elem_type == InterpreterBase.FOR_NODE:
                 self.__for(statement)
             elif statement.elem_type == InterpreterBase.RETURN_NODE:
-                self.__return(statement)
+                return self.__return(statement)
     # Support recursion via function calls (checked)not entirely sure, could have some potential bugs
     # Support overloaded functions if they take different numbers of parameters(checked)
     # functions can return a value : return a default value of nil if functions
@@ -90,27 +92,32 @@ class Interpreter(InterpreterBase):
         func_name = call_node.get("name")
         if func_name == "print":
             return self.__call_print(call_node)
-        if func_name in ["inputi", "inputs"]:
+        elif func_name in ["inputi", "inputs"]:
             return self.__call_input(call_node)
         # check to see if calling function are defined
-        if func_name in self.func_name_to_ast:
+        elif func_name in self.func_name_to_ast:
             num_args = len(call_node.get("args"))
             # calling function must have the right num of arguments
             if num_args in self.func_name_to_ast[func_name]:  
                 func_node = self.func_name_to_ast[func_name][num_args]
-                self.__run_func(self, call_node, func_node)
+                # print("returned vallue of calling function: ",self.__run_func(call_node, func_node))
+                return self.__run_func(call_node, func_node)
             else:
-                super().error(ErrorType.NAME_ERROR, f"Function {func_name} not found")
-        super().error(ErrorType.NAME_ERROR, f"Function {func_name} not found")
+                super().error(ErrorType.NAME_ERROR, f"Function {func_name} not found, wrong num_arg")
+        else:
+            super().error(ErrorType.NAME_ERROR, f"Function {func_name} not found {self.func_name_to_ast}")
 
     def __run_func(self, call_node, func_node):
         self.env.enter_scope()
         for arg, para in zip(call_node.get("args"), func_node.get("args")):
             result = self.__eval_expr(arg)
             self.env.create(para.get("name"), result)
-        self.__run_statements(func_node.get("statements"))
+            # print(self.env.get(para.get("name")))
+        return_value = self.__run_statements(func_node.get("statements"))
+        # print("Return value after __run_function: ",return_value)
         self.env.exit_scope()
-
+        # print("Return value after __run_function: ",return_value.value)
+        return return_value
     def __call_print(self, call_ast):
         output = ""
         for arg in call_ast.get("args"):
@@ -159,16 +166,18 @@ class Interpreter(InterpreterBase):
     def __if(self, if_ast):
         self.env.enter_scope()
         condition_result = self.__eval_expr(if_ast.get("condition"))
-        if (condition_result.elem_type != Type.BOOL):
+        if (condition_result.type() != Type.BOOL):
             super().error(ErrorType.TYPE_ERROR, f"If condition does not return bool value")
         # execute statement in the if block if condition is true
+        returned_value = Value(Type.NIL, None)
         if condition_result:
-            self.__run_statements(if_ast.get("statements"))
+            returned_value = self.__run_statements(if_ast.get("statements"))
         else:
             else_clause_return = if_ast.get("else-staements")
             if else_clause_return != None:
-                self.__run_statements(else_clause_return)
+                returned_value = self.__run_statements(else_clause_return)
         self.env.exit_scope()
+        return returned_value
 
         
     # for(initializtion; condition; update){statement...statement} 
@@ -213,12 +222,15 @@ class Interpreter(InterpreterBase):
     def __return(self, return_ast):
         expression = return_ast.get("expression")
         if (expression == None):
-            return
+            # print("return none")
+            return Value(Type.NIL, None)
+        # print(isinstance(self.__eval_expr(expression), Value))
         return self.__eval_expr(expression)
 
 
     def __eval_expr(self, expr_ast):
         if expr_ast.elem_type == InterpreterBase.INT_NODE:
+            # print("return an int here")
             return Value(Type.INT, expr_ast.get("val"))
         if expr_ast.elem_type == InterpreterBase.STRING_NODE:
             return Value(Type.STRING, expr_ast.get("val"))
@@ -239,47 +251,60 @@ class Interpreter(InterpreterBase):
             return self.__eval_op(expr_ast)
 
     def __eval_op(self, ops_ast):
-        left_value_obj = self.__eval_expr(ops_ast.get("op1"))
-        right_value_obj = self.__eval_expr(ops_ast.get("op2"))
-        # Legal to compare different types (including None) with == and !=
-        # Illegal to compare diferent tyes with the rest of comparison operations(checked)
-        #  if happened, raise ErrorType.TYPE_ERROR(checked)
-        if left_value_obj.type() != right_value_obj.type():
-            if ops_ast.elem_type == "==":
-                return False
-            elif ops_ast.elem_type == "!=":
-                return True
-            else:
+        if(ops_ast.elem_type not in ["neg", "!"]):
+            left_value_obj = self.__eval_expr(ops_ast.get("op1"))
+            right_value_obj = self.__eval_expr(ops_ast.get("op2"))
+            # print(left_value_obj, right_value_obj.value())
+            # Legal to compare different types (including None) with == and !=
+            # Illegal to compare diferent tyes with the rest of comparison operations(checked)
+            #  if happened, raise ErrorType.TYPE_ERROR(checked)
+            if left_value_obj.type() != right_value_obj.type():
+                if ops_ast.elem_type == "==":
+                    return Value(Type.BOOL, False)
+                elif ops_ast.elem_type == "!=":
+                    return Value(Type.BOOL, True)
+                else:
+                    super().error(
+                    ErrorType.TYPE_ERROR,
+                    f"Incompatible types for {ops_ast.elem_type} operation",)
+            if ops_ast.elem_type not in self.op_to_lambda[left_value_obj.type()]:
                 super().error(
-                ErrorType.TYPE_ERROR,
-                f"Incompatible types for {ops_ast.elem_type} operation",)
-        if ops_ast.elem_type not in self.op_to_lambda[left_value_obj.type()]:
-            super().error(
-                ErrorType.TYPE_ERROR,
-                f"Incompatible operator {ops_ast.elem_type} for type {left_value_obj.type()}",
-            )
-        f = self.op_to_lambda[left_value_obj.type()][ops_ast.elem_type]
-        return f(left_value_obj, right_value_obj)
+                    ErrorType.TYPE_ERROR,
+                    f"Incompatible operator {ops_ast.elem_type} for type {left_value_obj.type()}",
+                )
+            f = self.op_to_lambda[left_value_obj.type()][ops_ast.elem_type]
+            return f(left_value_obj, right_value_obj)
+        else:
+            op1_obj = self.__eval_expr(ops_ast.get("op1"))
+            if(op1_obj.type()== Type.INT and ops_ast.elem_type == "neg"):
+                f = self.op_to_lambda[op1_obj.type()][ops_ast.elem_type]
+                # print("negative got here")
+                return f(op1_obj)
+            if(op1_obj.type() == Type.BOOL and ops_ast.elem_type == "!"):
+                f = self.op_to_lambda[op1_obj.type()][ops_ast.elem_type]
+                return f(op1_obj)
+           
+            
+
 
     def __setup_ops(self):
-        self.op_to_lambda = {}
+        self.op_to_lambda = {Type.INT: {},
+                            Type.BOOL: {},
+                            Type.STRING: {}
+        }
         # set up operations on integers
         # ARITH_OPS = {"+", "-", "*", "/", "-"}
         # # Comparison operations
         # COMP_OPS = {"==", "!=", "<", "<=", ">", ">="}
         # # Logical operations (precedence order negation > comparison and arithmetic operations > && > ||)
         # # Parser already takes care of it, no special handling nedded.
-        self.op_to_lambda[Type.INT] = {Type.INT: {},
-                                       Type.BOOL: {},
-                                       Type.STRING: {}
-        }
         # Illegal to use arithmetic operation on non-integer types
         int_operation = {
             "+": lambda x, y: Value(x.type(), x.value() + y.value( )),
             "-": lambda x, y: Value(x.type(), x.value() - y.value()),
-            "*": lambda x, y: Value(x.Type(), x.value() * y.value()),
-            "/": lambda x, y: Value(x.Type(), x.value() // y.value()),
-            "-": lambda x : Value(x.Type(), -x.value()),
+            "*": lambda x, y: Value(x.type(), x.value() * y.value()),
+            "/": lambda x, y: Value(x.type(), x.value() // y.value()),
+            "neg": lambda x : Value(x.type(), -x.value()),
             "==": lambda x, y: Value(Type.BOOL, x.value() == y.value()),
             "!=": lambda x, y: Value(Type.BOOL, x.value() != y.value()),
             "<": lambda x, y: Value(Type.BOOL, x.value() < y.value()),
@@ -289,20 +314,43 @@ class Interpreter(InterpreterBase):
         }
         # LOG_OPS = {"||", "&&", "!", "==", "!="}
         bool_operation = {
-            "||": lambda x, y: Value(x.Type(), x.value() or y.value()),
+            "||": lambda x, y: Value(x.type(), x.value() or y.value()),
             "&&": lambda x, y: Value(x.type(), x.value() and y.value()),
-            "!": lambda x : Value(x.Type(), not x.value()),
-            "==": lambda x, y: Value(x.Type(), x.value() == y.value()),
-            "!=": lambda x, y: Value(x.Type(), x.value() != y.value())
+            "!": lambda x : Value(x.type(), not x.value()),
+            "==": lambda x, y: Value(x.type(), x.value() == y.value()),
+            "!=": lambda x, y: Value(x.type(), x.value() != y.value())
         }
         # STR_OPS = {"+"}
         str_operation = {
-            "+": lambda x, y: Value(x.Type(), x.value() + y.value()),
-            "==": lambda x, y: Value(x.Type(), x.value() == y.value()),
-            "!=": lambda x, y: Value(x.Type(), x.value() != y.value())
+            "+": lambda x, y: Value(x.type(), x.value() + y.value()),
+            "==": lambda x, y: Value(x.type(), x.value() == y.value()),
+            "!=": lambda x, y: Value(x.type(), x.value() != y.value())
         }
         self.op_to_lambda[Type.INT].update(int_operation)
         self.op_to_lambda[Type.BOOL].update(bool_operation)
         self.op_to_lambda[Type.STRING].update(str_operation)
 
         # add other operators here later for int, string, bool, etc
+# def main():
+#     program =  """
+#       func foo() { 
+#  print("hello");
+#  /* no explicit return command */
+# }
+
+# func bar(a) {
+#   return a;  /* no return value specified */
+# }
+
+# func main() {
+#    var val;
+#    val = nil;
+#    print("hello");
+#    print(bar(4));
+#    if (bar(3) != 2) { print("this should print!"); }
+# }
+
+# """
+#     test = Interpreter()
+#     test.run(program)
+# main()
