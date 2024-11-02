@@ -26,6 +26,7 @@ class Interpreter(InterpreterBase):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
         self.__setup_ops()
+        self.is_return = False
 
     # run a program that's provided in a string
     # usese the provided Parser found in brewparse.py to parse the program
@@ -66,7 +67,7 @@ class Interpreter(InterpreterBase):
         # all statements of a function are held in arg3 of the function AST node
         returned_value = Value(Type.NIL, None)
         for statement in statements:
-            print(statement)
+            # print(statement)
             if self.trace_output:
                 print(statement)
             if statement.elem_type == InterpreterBase.FCALL_NODE:
@@ -78,14 +79,16 @@ class Interpreter(InterpreterBase):
             elif statement.elem_type == InterpreterBase.IF_NODE:
                 result = self.__if(statement)
                 # if block has return statement, terminate the function
-                if (result is not None):
+                if self.is_return:
                     # print(result.value())
+                    self.is_return = False
                     return result
             elif statement.elem_type == InterpreterBase.FOR_NODE:
                 self.__for(statement)
             elif statement.elem_type == InterpreterBase.RETURN_NODE:
                 # print(statement.get("expression"))
                 # print(self.__return(statement).value())
+                self.is_return = True
                 return self.__return(statement)
         return returned_value
     # Support recursion via function calls (checked)not entirely sure, could have some potential bugs
