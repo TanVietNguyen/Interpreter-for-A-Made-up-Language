@@ -22,7 +22,7 @@ class EnvironmentManager:
     def set(self, symbol, value):
         for scope in reversed(self.environment):
             if symbol in scope:
-                self.environment[self.environment.index(scope)][symbol] = value
+                self.environment[-1][symbol] = value
                 return True
         return False
         

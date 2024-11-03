@@ -160,11 +160,12 @@ class Interpreter(InterpreterBase):
     def __assign(self, assign_ast):
         var_name = assign_ast.get("name")
         value_obj = self.__eval_expr(assign_ast.get("expression"))
+        # print(value_obj.value())
         if not self.env.set(var_name, value_obj):
             super().error(
                 ErrorType.NAME_ERROR, f"Undefined variable {var_name} in assignment"
             )
-
+        # print(var_name, self.env.get(var_name).value())
     def __var_def(self, var_ast):
         var_name = var_ast.get("name")
         if not self.env.create(var_name, Value(Type.INT, 0)):
@@ -189,7 +190,10 @@ class Interpreter(InterpreterBase):
         # execute statement in the if block if condition is true
         returned_value = None
         if condition_result.value():
+            # print(condition_result.value())
+            self.env.enter_scope()
             returned_value = self.__run_statements(if_ast.get("statements"))
+            self.env.exit_scope()
             # print(returned_value)
         else:
             # print(condition_result.value())
@@ -197,7 +201,9 @@ class Interpreter(InterpreterBase):
             # print(else_clause_return)
             if else_clause_return != None:
                 # print("running statements in else block")
+                self.env.enter_scope()
                 returned_value = self.__run_statements(else_clause_return)
+                self.env.exit_scope()
         self.env.exit_scope()
         # print(returned_value)
         return returned_value
@@ -379,29 +385,31 @@ class Interpreter(InterpreterBase):
         self.op_to_lambda[Type.NIL].update(nil_operation)
 
         # add other operators here later for int, string, bool, etc
-def main():
-    program =   """
-func foo(c) { 
-  if (c == 10) {
-    return 5;
-  }
-  else {
-    return 3;
-  }
-}
+# def main():
+#     program =   """
+# func foo(c) { 
+#   if (c == 10) {
+#     c = "hi";  /* reassigning c from the outer-block */
+#     print(c);  /* prints "hi" */
+#   }
+#   print(c); /* prints “hi” */
+# }
 
-func main() {
-  print(foo(10));
-  print(foo(11));
-}
+# func main() {
+#   var c;
+#   c = 10;
+#   foo(c);
+#   print(c);
+# }
 
-/*
-*OUT*
-5
-3
-*OUT*
-*/
-"""
-    test = Interpreter()
-    test.run(program)
-main()
+# /*
+# *OUT*
+# hi
+# hi
+# 10
+# *OUT*
+# */
+# """
+#     test = Interpreter()
+#     test.run(program)
+# main()
