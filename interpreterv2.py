@@ -192,7 +192,9 @@ class Interpreter(InterpreterBase):
             returned_value = self.__run_statements(if_ast.get("statements"))
             # print(returned_value)
         else:
-            else_clause_return = if_ast.get("else-staements")
+            # print(condition_result.value())
+            else_clause_return = if_ast.get("else_statements")
+            # print(else_clause_return)
             if else_clause_return != None:
                 # print("running statements in else block")
                 returned_value = self.__run_statements(else_clause_return)
@@ -377,17 +379,29 @@ class Interpreter(InterpreterBase):
         self.op_to_lambda[Type.NIL].update(nil_operation)
 
         # add other operators here later for int, string, bool, etc
-# def main():
-#     program =   """
-# func main() {
-#   print(-true);
-# }
+def main():
+    program =   """
+func foo(c) { 
+  if (c == 10) {
+    return 5;
+  }
+  else {
+    return 3;
+  }
+}
 
-# /*
-# *OUT*
-# ErrorType.TYPE_ERROR
-# *OUT*
-# */ """
-#     test = Interpreter()
-#     test.run(program)
-# main()
+func main() {
+  print(foo(10));
+  print(foo(11));
+}
+
+/*
+*OUT*
+5
+3
+*OUT*
+*/
+"""
+    test = Interpreter()
+    test.run(program)
+main()
