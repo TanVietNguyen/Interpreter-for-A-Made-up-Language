@@ -319,10 +319,11 @@ class Interpreter(InterpreterBase):
                 f = self.op_to_lambda[op1_obj.type()][ops_ast.elem_type]
                 # print("negative got here")
                 return f(op1_obj)
-            if(op1_obj.type() == Type.BOOL and ops_ast.elem_type == "!"):
+            elif(op1_obj.type() == Type.BOOL and ops_ast.elem_type == "!"):
                 f = self.op_to_lambda[op1_obj.type()][ops_ast.elem_type]
                 return f(op1_obj)
-           
+            else:
+                super().error(ErrorType.TYPE_ERROR, f"Wrong type for operation {ops_ast.elem_type}")
             
 
 
@@ -378,22 +379,15 @@ class Interpreter(InterpreterBase):
         # add other operators here later for int, string, bool, etc
 # def main():
 #     program =   """
-# func compute() {
-#     var i;
-#     for (i = 1; i <= 5; i = i + 1) {
-#         var j;
-#         for (j = 1; j <= 5; j = j + 1) {
-#             if (i * j == 6) {
-#                 return i * 10 + j;
-#             }
-#         }
-#     }
-#     return -1;
+# func main() {
+#   print(-true);
 # }
 
-# func main() {
-#     print(compute());
-# }   """
+# /*
+# *OUT*
+# ErrorType.TYPE_ERROR
+# *OUT*
+# */ """
 #     test = Interpreter()
 #     test.run(program)
 # main()
