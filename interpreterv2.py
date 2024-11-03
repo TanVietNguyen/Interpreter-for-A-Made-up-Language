@@ -26,7 +26,7 @@ class Interpreter(InterpreterBase):
         super().__init__(console_output, inp)
         self.trace_output = trace_output
         self.__setup_ops()
-        self.is_return = False
+        # self.is_return = False
 
     # run a program that's provided in a string
     # usese the provided Parser found in brewparse.py to parse the program
@@ -65,13 +65,13 @@ class Interpreter(InterpreterBase):
 #  no uppercases,no quotes. nil value will not be tested(checked)
     def __run_statements(self, statements):
         # all statements of a function are held in arg3 of the function AST node
-        returned_value = Value(Type.NIL, None)
+        # returned_value = Value(Type.NIL, None)
         for statement in statements:
             # print(statement)
             if self.trace_output:
                 print(statement)
             if statement.elem_type == InterpreterBase.FCALL_NODE:
-                returned_value = self.__call_func(statement)
+                self.__call_func(statement)
             elif statement.elem_type == "=":
                 self.__assign(statement)
             elif statement.elem_type == InterpreterBase.VAR_DEF_NODE:
@@ -79,18 +79,20 @@ class Interpreter(InterpreterBase):
             elif statement.elem_type == InterpreterBase.IF_NODE:
                 result = self.__if(statement)
                 # if block has return statement, terminate the function
-                if self.is_return:
+                if result is not None:
                     # print(result.value())
-                    self.is_return = False
+                    # self.is_return = False
                     return result
             elif statement.elem_type == InterpreterBase.FOR_NODE:
-                self.__for(statement)
+                result = self.__for(statement)
+                if result is not None:
+                    return result
             elif statement.elem_type == InterpreterBase.RETURN_NODE:
                 # print(statement.get("expression"))
                 # print(self.__return(statement).value())
-                self.is_return = True
+                # self.is_return = True
                 return self.__return(statement)
-        return returned_value
+        # return returned_value
     # Support recursion via function calls (checked)not entirely sure, could have some potential bugs
     # Support overloaded functions if they take different numbers of parameters(checked)
     # functions can return a value : return a default value of nil if functions
@@ -195,6 +197,7 @@ class Interpreter(InterpreterBase):
                 # print("running statements in else block")
                 returned_value = self.__run_statements(else_clause_return)
         self.env.exit_scope()
+        # print(returned_value)
         return returned_value
 
         
@@ -212,17 +215,24 @@ class Interpreter(InterpreterBase):
             self.__assign(initialization)
         else:
             super().error(ErrorType.TYPE_ERROR,"Initialization in loop must be an assignment")
-        loop_flag = True
-        while loop_flag:
+        while True:
             condition = self.__eval_expr(for_ast.get("condition"))
+            # print(for_ast.get("condition"))
             if (condition.type() != Type.BOOL):
                 super().error(ErrorType.TYPE_ERROR, "Loop condition must evaluate to bool values")
             statements = for_ast.get("statements")
             if condition.value():
-                self.__run_statements(statements)
+                # print(self.__run_statements(statements))
+                self.env.enter_scope()
+                result = self.__run_statements(statements)
+                self.env.exit_scope()
+                if result is not None:
+                    self.env.exit_scope()
+                    return result
             else:
-                loop_flag = False
+                break
             update = for_ast.get("update")
+            # print(update)
             if update.elem_type == "=":
                 self.__assign(update)
             else:
@@ -263,6 +273,7 @@ class Interpreter(InterpreterBase):
             var_name = expr_ast.get("name")
             val = self.env.get(var_name)
             if val is None:
+                # val = Value(Type.NIL, None)
                 super().error(ErrorType.NAME_ERROR, f"Variable {var_name} not found")
             return val
         # the returned value from the function will be used in the expression
@@ -366,30 +377,23 @@ class Interpreter(InterpreterBase):
 
         # add other operators here later for int, string, bool, etc
 # def main():
-#     program =    """
-#      func foo() {
-#  print(1);
-# }
-
-# func bar() {
-#  return nil;
+#     program =   """
+# func compute() {
+#     var i;
+#     for (i = 1; i <= 5; i = i + 1) {
+#         var j;
+#         for (j = 1; j <= 5; j = j + 1) {
+#             if (i * j == 6) {
+#                 return i * 10 + j;
+#             }
+#         }
+#     }
+#     return -1;
 # }
 
 # func main() {
-#  var x;
-#  x = foo();
-#  if (x == nil) {
-#   print(2);
-#  }
-#  var y;
-#  y = bar();
-#  if (y == nil) {
-#   print(3);
-#  }
- 
-# }
-
-# """
+#     print(compute());
+# }   """
 #     test = Interpreter()
 #     test.run(program)
 # main()

@@ -2,6 +2,7 @@
 # in a brewin program and the value of that variable - the value that's passed in can be
 # anything you like. In our implementation we pass in a Value object which holds a type
 # and a value (e.g., Int, 10).
+from type_valuev1 import Type, Value
 class EnvironmentManager:
     def __init__(self):
         # Environment is now a stack of dictionaries
@@ -12,6 +13,8 @@ class EnvironmentManager:
     def get(self, symbol):
         for scope in reversed(self.environment):
             if symbol in scope:
+                if(scope[symbol] == None):
+                    return Value(Type.NIL, None)
                 return scope[symbol]
         return None
 
@@ -36,5 +39,3 @@ class EnvironmentManager:
     
     def exit_scope(self):
         self.environment.pop()
-    def print_scope(self):
-        print(self.environment[-1])
