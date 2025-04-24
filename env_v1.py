@@ -22,7 +22,11 @@ class EnvironmentManager:
     def set(self, symbol, value):
         for scope in reversed(self.environment):
             if symbol in scope:
-                self.environment[-1][symbol] = value
+                # if self.environment.index(scope) != (len(self.environment) - 1):
+                #     self.create(symbol, value)
+                # else:
+                #     self.environment[-1][symbol] = value
+                self.environment[self.environment.index(scope)][symbol] = value
                 return True
         return False
         
@@ -35,7 +39,11 @@ class EnvironmentManager:
         return False
     
     def enter_scope(self):
+        print(self.environment)
         self.environment.append({})
-    
+
     def exit_scope(self):
+        # print(self.environment)
         self.environment.pop()
+    def current_scope(self):
+        print (self.environment[-1])

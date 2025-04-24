@@ -134,6 +134,7 @@ class Interpreter(InterpreterBase):
         return return_value
     
     def __call_print(self, call_ast):
+        print(call_ast)
         output = ""
         for arg in call_ast.get("args"):
             result = self.__eval_expr(arg)  # result is a Value object
@@ -160,12 +161,13 @@ class Interpreter(InterpreterBase):
     def __assign(self, assign_ast):
         var_name = assign_ast.get("name")
         value_obj = self.__eval_expr(assign_ast.get("expression"))
-        # print(value_obj.value())
+        print(value_obj.value())
         if not self.env.set(var_name, value_obj):
             super().error(
                 ErrorType.NAME_ERROR, f"Undefined variable {var_name} in assignment"
             )
         # print(var_name, self.env.get(var_name).value())
+        # print(self.env.current_scope())
     def __var_def(self, var_ast):
         var_name = var_ast.get("name")
         if not self.env.create(var_name, Value(Type.INT, 0)):
@@ -180,7 +182,7 @@ class Interpreter(InterpreterBase):
     # self.dict holds 3 keys: "condition", "statements", "else-statements"(map to NONE
     # if no else clause, otherwise statements in this block will be executed once condition is false)(checked)
     def __if(self, if_ast):
-        self.env.enter_scope()
+        # self.env.enter_scope()
         # print(if_ast.get("condition"))
         condition_result = self.__eval_expr(if_ast.get("condition"))
         
@@ -204,7 +206,7 @@ class Interpreter(InterpreterBase):
                 self.env.enter_scope()
                 returned_value = self.__run_statements(else_clause_return)
                 self.env.exit_scope()
-        self.env.exit_scope()
+        # self.env.exit_scope()
         # print(returned_value)
         return returned_value
 
@@ -385,31 +387,31 @@ class Interpreter(InterpreterBase):
         self.op_to_lambda[Type.NIL].update(nil_operation)
 
         # add other operators here later for int, string, bool, etc
-# def main():
-#     program =   """
-# func foo(c) { 
-#   if (c == 10) {
-#     c = "hi";  /* reassigning c from the outer-block */
-#     print(c);  /* prints "hi" */
-#   }
-#   print(c); /* prints “hi” */
-# }
+def main():
+    program =   """
+func foo(c) { 
+  if (c == 10) {
+    c = "hi";  /* reassigning c from the outer-block */
+    print(c);  /* prints "hi" */
+  }
+  print(c); /* prints “hi” */
+}
 
-# func main() {
-#   var c;
-#   c = 10;
-#   foo(c);
-#   print(c);
-# }
+func main() {
+  var c;
+  c = 10;
+  foo(c);
+  print(c);
+}
 
-# /*
-# *OUT*
-# hi
-# hi
-# 10
-# *OUT*
-# */
-# """
-#     test = Interpreter()
-#     test.run(program)
-# main()
+/*
+*OUT*
+hi
+hi
+10
+*OUT*
+*/
+"""
+    test = Interpreter()
+    test.run(program)
+main()
